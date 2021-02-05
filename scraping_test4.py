@@ -4,8 +4,11 @@ from urllib.parse import urljoin
 import db_for_url as db
 import json
 import datetime
- 
-#оразец записи данных в карту сайта
+import networkx
+from networkx import *
+import pylab as plt
+
+#образец записи данных в карту сайта
 patt = """
 <url>
    <loc>{0}</loc>
@@ -20,7 +23,7 @@ urls_met = []
 stack = []
 url = 'https://quotes.toscrape.com/' #TODO input('Введите адрес сайта :')
 host = 'https://quotes.toscrape.com' #TODO input('Введите HOST сайта :')
-
+G=nx.Graph()
 
 def get_page(html):# получение страницы
     page = requests.get(html)
@@ -29,7 +32,7 @@ def get_page(html):# получение страницы
 
 def get_title(html): # получение заголовка страницы
     page = requests.get(html)
-    if page.status_code == 200:
+    if page.status_code == 200: #проверка доступа к странице
         #получение страницы в объекты супа
         soup = BeautifulSoup(page.text, 'html.parser')
         # поиск заголовка страницы
@@ -68,7 +71,7 @@ def check_in_or_out_url(html): #проверка ссылок на внешни�
 
 url_from_page_start = get_content(url)
 now = datetime.datetime.now()
-out=open('sitemap.xml', 'w') # Создаем файл sitemap в текущею папку скрипта
+out=open('sitemap.xml', 'w') # Создаем файл sitemap в текущей папке скрипта
 print(len(url_from_page_start))
 db.create_db()
 db.create_db_follow()
@@ -79,6 +82,8 @@ for i in url_from_page_start:
         out.write(patt.format(i, now) + '\n')
         urls_met.append(i)
         stack.append(i)
+        db.add_db_follow(url, i)
+        G.add_edge(url, i)
     else:
         db.add_count_in_db(i)
 print('stack - ' + str(len(stack)))
@@ -91,9 +96,7 @@ while stack != []:
     else:
         new_urls = get_content(url_from_stack)
         if url_from_stack in urls_met:
-            new_urls_json = json.dumps(new_urls) #преобразование массива в json
-            db.add_db_follow(url_from_stack, new_urls_json)
-        print('new_urls - ' + str(len(new_urls)))
+            print('new_urls - ' + str(len(new_urls)))
         for i in new_urls:
                 if i not in urls_met:
                     title = get_title(i)
@@ -101,8 +104,13 @@ while stack != []:
                     out.write(patt.format(i, now) + '\n')
                     stack.append(i)
                     urls_met.append(i)
+                    db.add_db_follow(url_from_stack, i)
+                    G.add_edge(url_from_stack, i)
+                    print_graf()
                 else:
                     db.add_count_in_db(i)
+                    db.add_db_follow(url_from_stack, i)
 else:
     print('end')
     out.close()
+    print_graf()
